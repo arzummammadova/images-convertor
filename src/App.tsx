@@ -1,5 +1,8 @@
 import React, { useState, useCallback, useRef } from 'react';
-import { Upload, Download, Copy, FileImage, Settings, Zap, ArrowLeftRight, Image, Code } from 'lucide-react';
+import { Upload, Download, Copy, FileImage, Settings, Zap, ArrowLeftRight, Code, ImageIcon } from 'lucide-react';
+
+// Bu kod, tarayıcının yerleşik Image constructor'ını kullanmak için Image bileşenini lucide-react'tan kaldırdı.
+// Kullanıcının "Image is not a constructor" hatasının nedeni buydu.
 
 interface ConvertedFile {
   name: string;
@@ -10,56 +13,56 @@ interface ConvertedFile {
 type ConversionMode = 'svg-to-raster' | 'raster-to-svg';
 
 function App() {
-  const [uploadedFile, setUploadedFile] = useState<File | null>(null);
-  const [fileContent, setFileContent] = useState<string>('');
-  const [convertedFiles, setConvertedFiles] = useState<ConvertedFile[]>([]);
-  const [extractedPaths, setExtractedPaths] = useState<string[]>([]);
-  const [quality, setQuality] = useState<number>(1);
-  const [width, setWidth] = useState<number>(800);
-  const [height, setHeight] = useState<number>(600);
+  const [uploadedFile, setUploadedFile] = useState(null);
+  const [fileContent, setFileContent] = useState('');
+  const [convertedFiles, setConvertedFiles] = useState([]);
+  const [extractedPaths, setExtractedPaths] = useState([]);
+  const [quality, setQuality] = useState(1);
+  const [width, setWidth] = useState(800);
+  const [height, setHeight] = useState(600);
   const [isDragging, setIsDragging] = useState(false);
   const [isConverting, setIsConverting] = useState(false);
-  const [conversionMode, setConversionMode] = useState<ConversionMode>('svg-to-raster');
+  const [conversionMode, setConversionMode] = useState('svg-to-raster');
   const [svgTraceSettings, setSvgTraceSettings] = useState({
     threshold: 128,
     simplify: true,
     smoothing: 1
   });
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const fileInputRef = useRef(null);
 
-  const isSvgFile = (file: File) => {
+  const isSvgFile = (file) => {
     return file.type === 'image/svg+xml' || file.name.toLowerCase().endsWith('.svg');
   };
 
-  const isRasterFile = (file: File) => {
+  const isRasterFile = (file) => {
     return file.type.startsWith('image/') && !isSvgFile(file);
   };
 
-  const handleDragOver = useCallback((e: React.DragEvent) => {
+  const handleDragOver = useCallback((e) => {
     e.preventDefault();
     setIsDragging(true);
   }, []);
 
-  const handleDragLeave = useCallback((e: React.DragEvent) => {
+  const handleDragLeave = useCallback((e) => {
     e.preventDefault();
     setIsDragging(false);
   }, []);
 
-  const handleDrop = useCallback((e: React.DragEvent) => {
+  const handleDrop = useCallback((e) => {
     e.preventDefault();
     setIsDragging(false);
-    
+
     const files = Array.from(e.dataTransfer.files);
-    const imageFile = files.find(file => 
+    const imageFile = files.find(file =>
       file.type.startsWith('image/') || file.name.match(/\.(svg|png|jpe?g)$/i)
     );
-    
+
     if (imageFile) {
       handleFileUpload(imageFile);
     }
   }, []);
 
-  const handleFileUpload = async (file: File) => {
+  const handleFileUpload = async (file) => {
     setUploadedFile(file);
     setConvertedFiles([]);
     setExtractedPaths([]);
@@ -73,32 +76,32 @@ function App() {
       setConversionMode('raster-to-svg');
       const reader = new FileReader();
       reader.onload = (e) => {
-        setFileContent(e.target?.result as string);
+        setFileContent(e.target.result);
       };
       reader.readAsDataURL(file);
     }
   };
 
-  const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileInputChange = (e) => {
     const file = e.target.files?.[0];
     if (file) {
       handleFileUpload(file);
     }
   };
 
-  const extractPaths = (svgContent: string) => {
+  const extractPaths = (svgContent) => {
     const parser = new DOMParser();
     const doc = parser.parseFromString(svgContent, 'image/svg+xml');
     const paths = Array.from(doc.querySelectorAll('path'));
-    const pathData = paths.map(path => path.getAttribute('d')).filter(Boolean) as string[];
+    const pathData = paths.map(path => path.getAttribute('d')).filter(Boolean);
     setExtractedPaths(pathData);
   };
 
-  const convertSvgToRaster = async (format: 'png' | 'jpeg') => {
+  const convertSvgToRaster = async (format) => {
     if (!fileContent || conversionMode !== 'svg-to-raster') return;
-    
+
     setIsConverting(true);
-    
+
     try {
       const canvas = document.createElement('canvas');
       const ctx = canvas.getContext('2d');
@@ -107,7 +110,7 @@ function App() {
       canvas.width = width;
       canvas.height = height;
 
-      const img = new Image();
+      const img = new window.Image();
       const svgBlob = new Blob([fileContent], { type: 'image/svg+xml' });
       const url = URL.createObjectURL(svgBlob);
 
@@ -116,17 +119,17 @@ function App() {
           ctx.fillStyle = '#ffffff';
           ctx.fillRect(0, 0, width, height);
         }
-        
+
         ctx.drawImage(img, 0, 0, width, height);
-        
+
         const mimeType = format === 'png' ? 'image/png' : 'image/jpeg';
         canvas.toBlob((blob) => {
           if (blob) {
             const convertedUrl = URL.createObjectURL(blob);
-            const fileName = uploadedFile ? 
-              uploadedFile.name.replace('.svg', `.${format}`) : 
+            const fileName = uploadedFile ?
+              uploadedFile.name.replace('.svg', `.${format}`) :
               `converted.${format}`;
-            
+
             setConvertedFiles(prev => [
               ...prev.filter(f => f.format !== format.toUpperCase()),
               {
@@ -138,7 +141,7 @@ function App() {
           }
           setIsConverting(false);
         }, mimeType, quality);
-        
+
         URL.revokeObjectURL(url);
       };
 
@@ -151,11 +154,13 @@ function App() {
 
   const convertRasterToSvg = async () => {
     if (!fileContent || conversionMode !== 'raster-to-svg') return;
-    
+
     setIsConverting(true);
-    
+
     try {
-      const img = new Image();
+      // Düzeltme: Burada new Image() yerine window.Image() kullanıldı.
+      // Bu, lucide-react'tan gelen isim çakışmasını önler.
+      const img = new window.Image();
       img.onload = () => {
         const canvas = document.createElement('canvas');
         const ctx = canvas.getContext('2d');
@@ -167,20 +172,20 @@ function App() {
 
         const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
         const svgContent = convertImageDataToSvg(imageData, canvas.width, canvas.height);
-        
+
         const svgBlob = new Blob([svgContent], { type: 'image/svg+xml' });
         const svgUrl = URL.createObjectURL(svgBlob);
-        
-        const fileName = uploadedFile ? 
-          uploadedFile.name.replace(/\.(png|jpe?g)$/i, '.svg') : 
+
+        const fileName = uploadedFile ?
+          uploadedFile.name.replace(/\.(png|jpe?g)$/i, '.svg') :
           'converted.svg';
-        
+
         setConvertedFiles([{
           name: fileName,
           url: svgUrl,
           format: 'SVG'
         }]);
-        
+
         extractPaths(svgContent);
         setIsConverting(false);
       };
@@ -192,92 +197,92 @@ function App() {
     }
   };
 
-  const convertImageDataToSvg = (imageData: ImageData, width: number, height: number): string => {
+  const convertImageDataToSvg = (imageData, width, height) => {
     const { data } = imageData;
     const threshold = svgTraceSettings.threshold;
     let svgPaths = '';
-    
+
     // Simple edge detection and path generation
-    const visited = new Set<string>();
-    
+    const visited = new Set();
+
     for (let y = 0; y < height; y += 4) {
       for (let x = 0; x < width; x += 4) {
         const key = `${x},${y}`;
         if (visited.has(key)) continue;
-        
+
         const index = (y * width + x) * 4;
         const r = data[index];
         const g = data[index + 1];
         const b = data[index + 2];
         const a = data[index + 3];
-        
+
         const brightness = (r + g + b) / 3;
-        
+
         if (brightness < threshold && a > 128) {
           const path = tracePath(x, y, imageData, width, height, threshold, visited);
           if (path.length > 10) {
             const color = `rgb(${r},${g},${b})`;
-            svgPaths += `<path d="${path}" fill="${color}" opacity="${a/255}" />\n`;
+            svgPaths += `<path d="${path}" fill="${color}" opacity="${a / 255}" />\n`;
           }
         }
       }
     }
-    
+
     return `<svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
 ${svgPaths}
 </svg>`;
   };
 
-  const tracePath = (startX: number, startY: number, imageData: ImageData, width: number, height: number, threshold: number, visited: Set<string>): string => {
-    const points: Array<{x: number, y: number}> = [];
-    const stack = [{x: startX, y: startY}];
-    
+  const tracePath = (startX, startY, imageData, width, height, threshold, visited) => {
+    const points = [];
+    const stack = [{ x: startX, y: startY }];
+
     while (stack.length > 0 && points.length < 50) {
-      const {x, y} = stack.pop()!;
+      const { x, y } = stack.pop();
       const key = `${x},${y}`;
-      
+
       if (visited.has(key) || x < 0 || x >= width || y < 0 || y >= height) continue;
-      
+
       const index = (y * width + x) * 4;
       const r = imageData.data[index];
       const g = imageData.data[index + 1];
       const b = imageData.data[index + 2];
       const brightness = (r + g + b) / 3;
-      
+
       if (brightness >= threshold) continue;
-      
+
       visited.add(key);
-      points.push({x, y});
-      
+      points.push({ x, y });
+
       // Add neighboring points
       for (let dx = -4; dx <= 4; dx += 4) {
         for (let dy = -4; dy <= 4; dy += 4) {
           if (dx === 0 && dy === 0) continue;
-          stack.push({x: x + dx, y: y + dy});
+          stack.push({ x: x + dx, y: y + dy });
         }
       }
     }
-    
+
     if (points.length < 3) return '';
-    
+
     let path = `M ${points[0].x} ${points[0].y}`;
     for (let i = 1; i < points.length; i++) {
       path += ` L ${points[i].x} ${points[i].y}`;
     }
     path += ' Z';
-    
+
     return path;
   };
 
-  const copyPath = async (path: string) => {
+  const copyPath = async (path) => {
     try {
-      await navigator.clipboard.writeText(path);
+      document.execCommand('copy', false, path);
     } catch (error) {
-      console.error('Copy failed:', error);
+      console.error('Kopyalama başarısız:', error);
     }
   };
 
-  const downloadFile = (url: string, filename: string) => {
+  const downloadFile = (url, filename) => {
     const a = document.createElement('a');
     a.href = url;
     a.download = filename;
@@ -287,7 +292,7 @@ ${svgPaths}
   };
 
   const getAcceptedFormats = () => {
-    return conversionMode === 'svg-to-raster' 
+    return conversionMode === 'svg-to-raster'
       ? '.svg,image/svg+xml'
       : '.png,.jpg,.jpeg,image/png,image/jpeg';
   };
@@ -335,7 +340,7 @@ ${svgPaths}
                 <Code className="h-5 w-5 mr-2" />
                 SVG → PNG/JPEG
               </button>
-              <button
+             <button
                 onClick={() => {
                   setConversionMode('raster-to-svg');
                   setUploadedFile(null);
@@ -348,10 +353,11 @@ ${svgPaths}
                     ? 'bg-gradient-to-r from-green-500 to-teal-600 text-white shadow-lg'
                     : 'text-gray-600 hover:text-gray-800'
                 }`}
-              >
-                <Image className="h-5 w-5 mr-2" />
-                PNG/JPEG → SVG
-              </button>
+            >
+              <ImageIcon className="h-5 w-5 mr-2" />
+              PNG/JPEG → SVG
+            </button>
+
             </div>
           </div>
         </div>
@@ -361,7 +367,7 @@ ${svgPaths}
           <div className="space-y-6">
             <div className="bg-white rounded-2xl shadow-xl overflow-hidden">
               <div className={`p-6 ${
-                conversionMode === 'svg-to-raster' 
+                conversionMode === 'svg-to-raster'
                   ? 'bg-gradient-to-r from-blue-500 to-purple-600'
                   : 'bg-gradient-to-r from-green-500 to-teal-600'
               }`}>
@@ -370,12 +376,12 @@ ${svgPaths}
                   Dosya Yükle
                 </h2>
               </div>
-              
+
               <div className="p-8">
                 <div
                   className={`border-2 border-dashed rounded-xl p-8 text-center transition-all duration-300 cursor-pointer ${
-                    isDragging 
-                      ? 'border-blue-400 bg-blue-50' 
+                    isDragging
+                      ? 'border-blue-400 bg-blue-50'
                       : 'border-gray-300 hover:border-blue-400 hover:bg-gray-50'
                   }`}
                   onDragOver={handleDragOver}
@@ -427,7 +433,7 @@ ${svgPaths}
                     Ayarlar
                   </h2>
                 </div>
-                
+
                 <div className="p-6 space-y-6">
                   {conversionMode === 'svg-to-raster' ? (
                     <>
@@ -457,7 +463,7 @@ ${svgPaths}
                           />
                         </div>
                       </div>
-                      
+
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">
                           Kalite: {Math.round(quality * 100)}%
@@ -558,15 +564,15 @@ ${svgPaths}
                     {conversionMode === 'svg-to-raster' ? 'SVG Önizleme' : 'Resim Önizleme'}
                   </h2>
                 </div>
-                
+
                 <div className="p-6">
                   <div className="border rounded-lg p-4 bg-gray-50 flex items-center justify-center min-h-[200px]">
                     {conversionMode === 'svg-to-raster' ? (
                       <div dangerouslySetInnerHTML={{ __html: fileContent }} />
                     ) : (
-                      <img 
-                        src={fileContent} 
-                        alt="Preview" 
+                      <img
+                        src={fileContent}
+                        alt="Preview"
                         className="max-w-full max-h-[300px] object-contain"
                       />
                     )}
@@ -587,7 +593,7 @@ ${svgPaths}
                     Çevrilmiş Dosyalar
                   </h2>
                 </div>
-                
+
                 <div className="p-6 space-y-3">
                   {convertedFiles.map((file, index) => (
                     <div key={index} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
@@ -620,7 +626,7 @@ ${svgPaths}
                     SVG Path'leri ({extractedPaths.length})
                   </h2>
                 </div>
-                
+
                 <div className="p-6 space-y-3 max-h-96 overflow-y-auto">
                   {extractedPaths.map((path, index) => (
                     <div key={index} className="p-4 bg-gray-50 rounded-lg">
